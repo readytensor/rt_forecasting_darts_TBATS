@@ -1,0 +1,13 @@
+{
+  "use_box_cox": null,
+  "box_cox_lower_bound": 0,
+  "box_cox_upper_bound": 1,
+  "use_trend": null,
+  "use_damped_trend": null,
+  "seasonal_periods": "freq",
+  "use_arma_errors": true,
+  "show_warnings": false,
+  "n_jobs": null,
+  "multiprocessing_start_method": "spawn",
+  "random_state": 0
+}
