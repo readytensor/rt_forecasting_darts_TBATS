@@ -9,5 +9,6 @@
   "show_warnings": false,
   "n_jobs": null,
   "multiprocessing_start_method": "spawn",
-  "random_state": 0
+  "random_state": 0,
+  "history_forecast_ratio": 20 
 }
