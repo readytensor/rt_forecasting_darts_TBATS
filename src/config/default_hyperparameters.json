@@ -10,5 +10,5 @@
   "n_jobs": null,
   "multiprocessing_start_method": "spawn",
   "random_state": 0,
-  "history_forecast_ratio": 20 
+  "history_forecast_ratio": 10
 }
