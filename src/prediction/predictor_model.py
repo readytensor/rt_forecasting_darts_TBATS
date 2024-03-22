@@ -138,7 +138,7 @@ class Forecaster:
             show_warnings=False,
             n_jobs=n_jobs,
             multiprocessing_start_method="spawn",
-            random_state=123,
+            random_state=self.random_state,
         )
 
         series = TimeSeries.from_dataframe(
