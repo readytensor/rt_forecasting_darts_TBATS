@@ -8,11 +8,17 @@ from darts.models.forecasting.tbats_model import TBATS
 from darts import TimeSeries
 from schema.data_schema import ForecastingSchema
 from sklearn.exceptions import NotFittedError
+from multiprocessing import cpu_count
 
 warnings.filterwarnings("ignore")
-
-
 PREDICTOR_FILE_NAME = "predictor.joblib"
+
+# Determine the number of CPUs available
+n_cpus = cpu_count()
+
+# Set n_jobs to be one less than the number of CPUs, with a minimum of 1
+n_jobs = max(1, n_cpus - 1)
+print(f"Using n_jobs = {n_jobs}")
 
 
 class Forecaster:
@@ -34,9 +40,6 @@ class Forecaster:
         use_damped_trend: Optional[bool] = None,
         seasonal_periods: Union[str, List, None] = "freq",
         use_arma_errors: Optional[bool] = True,
-        show_warnings: bool = False,
-        n_jobs: Optional[int] = None,
-        multiprocessing_start_method: Optional[str] = "spawn",
         random_state: int = 0,
     ):
         """Construct a new TBATS Forecaster
@@ -71,14 +74,6 @@ class Forecaster:
             use_arma_errors (Optional[bool]): When True TBATS will try to improve the model by modelling residuals with ARMA.
                 Best model will be selected by AIC. If False, ARMA residuals modeling will not be considered.
 
-            show_warnings (bool): If warnings should be shown or not.
-
-            n_jobs (Optional[int]): How many jobs to run in parallel when fitting TBATS model.
-                When not provided TBATS shall try to utilize all available cpu cores.
-
-            multiprocessing_start_method (Optional[str]): How threads should be started.
-                See https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
-
             random_state (int): Sets the underlying random seed at model initialization time.
         """
         self.data_schema = data_schema
@@ -88,9 +83,6 @@ class Forecaster:
         self.use_damped_trend = use_damped_trend
         self.seasonal_periods = seasonal_periods
         self.use_arma_errors = use_arma_errors
-        self.show_warnings = show_warnings
-        self.n_jobs = n_jobs
-        self.multiprocessing_start_method = multiprocessing_start_method
         self.random_state = random_state
         self._is_trained = False
         self.models = {}
@@ -143,10 +135,10 @@ class Forecaster:
             use_damped_trend=self.use_damped_trend,
             seasonal_periods=self.seasonal_periods,
             use_arma_errors=self.use_arma_errors,
-            show_warnings=self.show_warnings,
-            n_jobs=self.n_jobs,
-            multiprocessing_start_method=self.multiprocessing_start_method,
-            random_state=self.random_state,
+            show_warnings=False,
+            n_jobs=n_jobs,
+            multiprocessing_start_method="spawn",
+            random_state=123,
         )
 
         series = TimeSeries.from_dataframe(
