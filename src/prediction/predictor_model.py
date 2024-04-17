@@ -8,17 +8,14 @@ from darts.models.forecasting.tbats_model import TBATS
 from darts import TimeSeries
 from schema.data_schema import ForecastingSchema
 from sklearn.exceptions import NotFittedError
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Pool
 
 warnings.filterwarnings("ignore")
 PREDICTOR_FILE_NAME = "predictor.joblib"
 
 # Determine the number of CPUs available
-n_cpus = cpu_count()
-
-# Set n_jobs to be one less than the number of CPUs, with a minimum of 1
-n_jobs = max(1, n_cpus - 1)
-print(f"Using n_jobs = {n_jobs}")
+CPUS_TO_USE = max(1, cpu_count() - 1) # spare one CPU for other tasks
+NUM_CPUS_PER_BATCH = 1    # Number of CPUs each batch can use
 
 
 class Forecaster:
@@ -98,14 +95,6 @@ class Forecaster:
         history: pd.DataFrame,
         data_schema: ForecastingSchema,
     ) -> None:
-        """Fit the Forecaster to the training data.
-        A separate TBATS model is fit to each series that is contained
-        in the data.
-
-        Args:
-            history (pandas.DataFrame): The features of the training data.
-            data_schema (ForecastingSchema): The schema of the training data.
-        """
         np.random.seed(self.random_state)
         groups_by_ids = history.groupby(data_schema.id_col)
         all_ids = list(groups_by_ids.groups.keys())
@@ -114,17 +103,43 @@ class Forecaster:
             for id_ in all_ids
         ]
 
-        self.models = {}
+        # Prepare batches of series to be processed in parallel
+        num_parallel_batches = CPUS_TO_USE // NUM_CPUS_PER_BATCH
+        if len(all_ids) <= num_parallel_batches:
+            series_per_batch = 1
+        else:
+            series_per_batch = 1 + (len(all_ids) // num_parallel_batches)
+        series_batches = [
+            all_series[i:i + series_per_batch]
+            for i in range(0, len(all_series), series_per_batch)
+        ]
+        id_batches = [
+            all_ids[i:i + series_per_batch]
+            for i in range(0, len(all_ids), series_per_batch)
+        ]
 
-        for id, series in zip(all_ids, all_series):
-            if self.history_length:
-                series = series[-self.history_length :]
-            model = self._fit_on_series(history=series, data_schema=data_schema)
-            self.models[id] = model
+        # Use multiprocessing to fit models in parallel
+        with Pool(processes=len(series_batches)) as pool:
+            results = pool.starmap(
+                self.fit_batch_of_series,
+                zip(series_batches, id_batches, [data_schema] * len(series_batches))
+            )
 
+        # Flatten results and update the models dictionary
+        self.models = {id: model for batch in results for id, model in batch.items()}       
+        
         self.all_ids = all_ids
         self._is_trained = True
         self.data_schema = data_schema
+
+    def fit_batch_of_series(self, series_batch, ids_batch, data_schema):
+        models = {}
+        for series, id in zip(series_batch, ids_batch):
+            if self.history_length:
+                series = series[-self.history_length:]
+            model = self._fit_on_series(history=series, data_schema=data_schema)
+            models[id] = model
+        return models
 
     def _fit_on_series(self, history: pd.DataFrame, data_schema: ForecastingSchema):
         """Fit TBATS model to given individual series of data"""
@@ -136,7 +151,7 @@ class Forecaster:
             seasonal_periods=self.seasonal_periods,
             use_arma_errors=self.use_arma_errors,
             show_warnings=False,
-            n_jobs=n_jobs,
+            n_jobs=1,
             multiprocessing_start_method="spawn",
             random_state=self.random_state,
         )
