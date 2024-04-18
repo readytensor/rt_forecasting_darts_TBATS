@@ -151,7 +151,7 @@ class Forecaster:
             seasonal_periods=self.seasonal_periods,
             use_arma_errors=self.use_arma_errors,
             show_warnings=False,
-            n_jobs=1,
+            n_jobs=NUM_CPUS_PER_BATCH,
             multiprocessing_start_method="spawn",
             random_state=self.random_state,
         )
